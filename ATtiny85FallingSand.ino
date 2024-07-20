@@ -16,8 +16,9 @@ void setup(void)
 
 void loop(void)
 {
-    if (updateSands()) {
-        refreshScreen(drawSands);
-    }
-    //_delay_ms(DELAY_LOOP);
+    long now = millis();
+    updateSands();
+    refreshScreen(drawSands);
+    long wait = now + DELAY_LOOP - millis();
+    if (wait > 0) delay(wait);
 }

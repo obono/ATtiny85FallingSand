@@ -2,22 +2,15 @@
 
 /*  Defines  */
 
-enum : uint8_t {
-    SAND_EMPTY = 0,
-    SAND_NORMAL,
-    SAND_FIXED,
-};
-
-#define RANDOM_QUIVER       8
-#define RANDOM_THRESHOLD    64
-
 /*  Local Functions  */
 
 static void moveSands(int16_t vx, int16_t vy);
 static void moveSand(int8_t x, int8_t y, int16_t vx, int16_t vy);
-static uint8_t getSand(int8_t x, int8_t y);
-static void setSand(int8_t x, int8_t y, uint8_t s);
 static int8_t ternaryRandom(int16_t r);
+
+/*  Local Functions (macros)  */
+
+#define mersenneRandom(n)   (random() & ((1 << n) - 1))
 
 /*  Local Variables  */
 
@@ -27,27 +20,27 @@ static uint16_t sands[BOX_SIZE];
 
 void initSands(void)
 {
-    uint8_t r = random(16, 48);
+    uint8_t r = mersenneRandom(5) + 16;
     for (uint8_t y = 0; y < BOX_SIZE; y++) {
+        sands[y] = 0;
         for (uint8_t x = 0; x < BOX_SIZE; x++) {
-            setSand(x, y, (random(64) < r) ? SAND_NORMAL : SAND_EMPTY);
+            if (mersenneRandom(6) < r) bitSet(sands[y], x);
         }
     }
 }
 
-bool updateSands(void)
+void updateSands(void)
 {
     int16_t vx, vy, vz;
     getAcceleration(&vx, &vy, &vz);
     moveSands(vx, -vy);
-    if (digitalRead(1) == LOW) setSand(0, 0, SAND_NORMAL);
-    if (digitalRead(3) == LOW) setSand(0, 0, SAND_EMPTY);
-    return true;
+    if (digitalRead(1) == LOW) bitSet(sands[0], 0);
+    if (digitalRead(3) == LOW) bitClear(sands[0], 0);
 }
 
 void drawSands(int16_t y, uint8_t *pBuffer)
 {
-    memcpy(pBuffer, (uint8_t*)(&sands[y]), sizeof(sands[0]) * PAGE_HEIGHT);
+    memcpy(pBuffer, (uint8_t*)(&sands[y]), PAGE_DATA_LENGTH);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -58,55 +51,37 @@ static void moveSands(int16_t vx, int16_t vy)
         int8_t y = (vy < 0) ? i : BOX_SIZE - 1 - i;
         for (uint8_t j = 0; j < BOX_SIZE; j++) {
             int8_t x = (vx < 0) ? j : BOX_SIZE - 1 - j;
-            if (getSand(x, y) == SAND_NORMAL) moveSand(x, y, vx, vy);
+            if (bitRead(sands[y], x)) moveSand(x, y, vx, vy);
         }
     }
 }
 
 static void moveSand(int8_t x, int8_t y, int16_t vx, int16_t vy)
 {
-    int8_t dx = ternaryRandom(vx);
-    int8_t dy = ternaryRandom(vy);
-    if (dx == 0 && dy == 0) return;
-    if (dx != 0 && dy != 0) {
-        if (getSand(x + dx, y + dy) != SAND_EMPTY) {
-            if (getSand(x + dx, y) != SAND_EMPTY) dx = 0;
-            if (getSand(x, y + dy) != SAND_EMPTY) dy = 0;
-            if (dx == 0 && dy == 0) return;
-            if (dx != 0 && dy != 0) {
-                if (random(2)) {
-                    dx = 0;
-                } else {
-                    dy = 0;
-                }
+    int8_t dx = x + ternaryRandom(vx);
+    int8_t dy = y + ternaryRandom(vy);
+    if (dx < 0 || dx >= BOX_SIZE) dx = x;
+    if (dy < 0 || dy >= BOX_SIZE) dy = y;
+    if (bitRead(sands[dy], dx)) {
+        if (!(dx != x && dy != y)) return;
+        if (bitRead(sands[y], dx)) dx = x;
+        if (bitRead(sands[dy], x)) dy = y;
+        if (dx == x && dy == y) return;
+        if (dx != x && dy != y) {
+            if (mersenneRandom(1)) {
+                dx = x;
+            } else {
+                dy = y;
             }
         }
-    } else {
-        if (getSand(x + dx, y + dy) != SAND_EMPTY) return;
     }
-    setSand(x, y, SAND_EMPTY);
-    setSand(x + dx, y + dy, SAND_NORMAL);
-}
-
-static uint8_t getSand(int8_t x, int8_t y)
-{
-    if (x < 0 || y < 0 || x >= BOX_SIZE || y >= BOX_SIZE) return SAND_FIXED;
-    return (bitRead(sands[y], x)) ? SAND_NORMAL : SAND_EMPTY;
-}
-
-static void setSand(int8_t x, int8_t y, uint8_t s)
-{
-    if (x < 0 || y < 0 || x >= BOX_SIZE || y >= BOX_SIZE) return;
-    if (s == SAND_EMPTY) {
-        bitClear(sands[y], x);
-    } else if (s == SAND_NORMAL) {
-        bitSet(sands[y], x);
-    }
+    bitClear(sands[y], x);
+    bitSet(sands[dy], dx);
 }
 
 static int8_t ternaryRandom(int16_t r)
 {
-    r += random(-RANDOM_QUIVER, RANDOM_QUIVER + 1);
-    if (random(RANDOM_THRESHOLD) >= abs(r)) return 0;
+    r += mersenneRandom(4) - 8;
+    if (mersenneRandom(6) >= abs(r)) return 0;
     return (r > 0) ? 1 : -1;
 }
