@@ -37,9 +37,15 @@
 #define MMA7455_BIT_GLVL0   2
 #define MMA7455_BIT_DRPD    6
 
+/*  Global Variables  */
+
+CONFIG_T    config;
+uint8_t     counter;
+
 /*  Local Variables  */
 
-static XYZ_T accel;
+static XYZ_T    accel;
+static uint8_t  currentButton, lastButton;
 
 /*---------------------------------------------------------------------------*/
 
@@ -47,9 +53,14 @@ void initCore(void)
 {
     SIMPLEWIRE::begin();
     delay(200);
-    uint8_t buf[7];
+    updateButtonState();
+
+    // Load configuration
+    eeprom_busy_wait();
+    eeprom_read_block(&config, (const void *)EEPROM_CONFIG_ADDR, sizeof(config));
 
     // Setup matrix LED
+    uint8_t buf[3];
     buf[0] = HT16K33_CMD_SETUP;
     buf[1] = HT16K33_CMD_DIMMING;
     buf[2] = HT16K33_CMD_DISPLAY;
@@ -63,10 +74,24 @@ void initCore(void)
     buf[0] = MMA7455_REG_MCTL;
     buf[1] = bit(MMA7455_BIT_GLVL0) | bit(MMA7455_BIT_MODE0) | bit(MMA7455_BIT_DRPD);
     SIMPLEWIRE::write(MMA7455_ADDRESS, buf, 2);
-    buf[0] = MMA7455_REG_XOFFL;
-    readConfig(0, &buf[1], 6);
-    SIMPLEWIRE::write(MMA7455_ADDRESS, buf, 7);
-    memset(&accel, 0, sizeof(accel));
+    setAccelerationOffset(&config.offset);
+    clearXYZ(accel);
+}
+
+void updateButtonState(void)
+{
+    lastButton = currentButton;
+    currentButton = ~PINB;
+}
+
+uint8_t isButtonPressed(uint8_t button)
+{
+    return currentButton & button;
+}
+
+uint8_t isButtonDown(uint8_t button)
+{
+    return currentButton & ~lastButton & button;
 }
 
 void refreshScreen(void (*func)(int16_t, uint8_t *))
@@ -83,49 +108,37 @@ void refreshScreen(void (*func)(int16_t, uint8_t *))
     }
 }
 
-void getAcceleration(int16_t *pX, int16_t *pY, int16_t *pZ)
+XYZ_T *getAcceleration(void)
 {
-    uint8_t reg, buf[6];
+    uint8_t reg, ret;
 #if 0
     reg = MMA7455_REG_STATUS;
     do {
         SIMPLEWIRE::write(MMA7455_ADDRESS, &reg, 1);
-        SIMPLEWIRE::read(MMA7455_ADDRESS, buf, 1);
-    } while (!bitRead(buf[0], MMA7455_BIT_DRDY));
+        SIMPLEWIRE::read(MMA7455_ADDRESS, &ret, 1);
+    } while (!bitRead(ret, MMA7455_BIT_DRDY));
 #endif
 
-#if 1
     reg = MMA7455_REG_XOUTL;
     SIMPLEWIRE::write(MMA7455_ADDRESS, &reg, 1);
-    if (SIMPLEWIRE::read(MMA7455_ADDRESS, (uint8_t *)&accel, 6) == 6) {
+    if (SIMPLEWIRE::read(MMA7455_ADDRESS, (uint8_t *)&accel, sizeof(accel)) > 0) {
         if (accel.reg.x_msb & 0x02) accel.reg.x_msb |= 0xfc;
         if (accel.reg.y_msb & 0x02) accel.reg.y_msb |= 0xfc;
         if (accel.reg.z_msb & 0x02) accel.reg.z_msb |= 0xfc;
     }
-#else
-    reg = MMA7455_REG_XOUT8;
-    SIMPLEWIRE::write(MMA7455_ADDRESS, &reg, 1);
-    if (SIMPLEWIRE::read(MMA7455_ADDRESS, buf, 3) == 3) {
-        accel.value.x = (int8_t)buf[0];
-        accel.value.y = (int8_t)buf[1];
-        accel.value.z = (int8_t)buf[2];
-    }
-#endif
-    *pX = accel.value.x;
-    *pY = accel.value.y;
-    *pZ = accel.value.z;
+    return &accel;
 }
 
-/*---------------------------------------------------------------------------*/
-
-void readConfig(uint16_t addr, void *pConfig, size_t size)
+void setAccelerationOffset(XYZ_T *pOffset)
 {
-    eeprom_busy_wait();
-    eeprom_read_block(pConfig, (const void *)addr, size);
+    uint8_t buf[7];
+    buf[0] = MMA7455_REG_XOFFL;
+    memcpy(&buf[1], pOffset, sizeof(XYZ_T));
+    SIMPLEWIRE::write(MMA7455_ADDRESS, buf, 7);
 }
 
-void writeConfig(uint16_t addr, const void *pConfig, size_t size)
+void saveConfig(void)
 {
     eeprom_busy_wait();
-    eeprom_write_block(pConfig, (void *)addr, size);
+    eeprom_write_block(&config, (void *)EEPROM_CONFIG_ADDR, sizeof(config));
 }

@@ -31,11 +31,10 @@ void initSands(void)
 
 void updateSands(void)
 {
-    int16_t vx, vy, vz;
-    getAcceleration(&vx, &vy, &vz);
-    moveSands(vx, -vy);
-    if (digitalRead(1) == LOW) bitSet(sands[0], 0);
-    if (digitalRead(3) == LOW) bitClear(sands[0], 0);
+    XYZ_T *pAccel = getAcceleration();
+    moveSands(pAccel->value.x, -pAccel->value.y);
+    if (isButtonPressed(DOWN_BUTTON)) bitSet(sands[0], 0);
+    if (isButtonPressed(UP_BUTTON)) bitClear(sands[0], 0);
 }
 
 void drawSands(int16_t y, uint8_t *pBuffer)
