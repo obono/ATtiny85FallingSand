@@ -58,6 +58,9 @@ void initCore(void)
     // Load configuration
     eeprom_busy_wait();
     eeprom_read_block(&config, (const void *)EEPROM_CONFIG_ADDR, sizeof(config));
+    if (config.wallType >= WALL_TYPE_MAX || config.amountType >= AMOUNT_TYPE_MAX) {
+        memset(&config, 0, sizeof(config));
+    }
 
     // Setup matrix LED
     uint8_t buf[3];

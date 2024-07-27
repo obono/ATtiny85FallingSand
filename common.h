@@ -8,6 +8,8 @@
 #define PAGE_HEIGHT         8
 #define PAGE_DATA_LENGTH    16
 
+#define WALL_TYPE_MAX       9
+#define AMOUNT_TYPE_MAX     6
 #define UP_BUTTON           bit(PINB3)
 #define DOWN_BUTTON         bit(PINB1)
 
@@ -33,8 +35,8 @@ union XYZ_T {
 
 typedef struct {
     XYZ_T   offset;
-    uint8_t dummy1;
-    uint8_t dummy2;
+    uint8_t wallType;
+    uint8_t amountType;
 } CONFIG_T;
 
 /*  Global Functions  */
