@@ -13,7 +13,10 @@
 #define UP_BUTTON           bit(PINB3)
 #define DOWN_BUTTON         bit(PINB1)
 
-#define EEPROM_CONFIG_ADDR  0
+#define EEPROM_ADDR_CONFIG  0
+#define EEPROM_ADDR_OFFSET  EEPROM_ADDR_CONFIG
+#define EEPROM_ADDR_TYPES   (EEPROM_ADDR_OFFSET + sizeof(XYZ_T))
+#define EEPROM_SIZE_TYPES   2
 
 /*  Typedefs  */
 
@@ -45,17 +48,21 @@ void    initCore(void);
 void    updateButtonState(void);
 uint8_t isButtonPressed(uint8_t button);
 uint8_t isButtonDown(uint8_t button);
-void    refreshScreen(void (*func)(int16_t, uint8_t *));
+
+void    clearScreen(void);
+void    drawChar(int8_t x, int8_t y, char c);
+void    drawNumber(int8_t x, int8_t y, int16_t n);
+void    drawString(int8_t y, const void *p);
+void    refreshScreen(void);
+
 XYZ_T   *getAcceleration(void);
 void    setAccelerationOffset(XYZ_T *pOffset);
-void    saveConfig(void);
+void    saveConfig(uint8_t addr, void *data, size_t len);
 
 void    initSands(void);
 void    updateSands(void);
-void    drawSands(int16_t y, uint8_t *pBuffer);
 void    initMaintenance(void);
 void    updateMaintenance(void);
-void    drawMaintenance(int16_t y, uint8_t *pBuffer);
 
 /*  Global Functions (macros)  */
 
@@ -64,4 +71,5 @@ void    drawMaintenance(int16_t y, uint8_t *pBuffer);
 /*  Global Variables  */
 
 extern CONFIG_T config;
+extern uint16_t screenBuffer[BOX_SIZE];
 extern uint8_t  counter;

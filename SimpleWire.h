@@ -2,6 +2,7 @@
   SimpleWire.h - I2C Single Master Mode Library for AVR
 
   Copyright (c) 2020 Sasapea's Lab. All right reserved.
+  Copyright (c) 2024 OBONO
 
   exsample:
 
@@ -334,6 +335,39 @@ class SimpleWire
       stop();
       return cnt;
     }
+
+    /*  The functional enhancement by OBONO  */
+    static int writeWithCommand(uint8_t addr, const uint8_t cmd, const uint8_t *buf = NULL, uint8_t len = 0)
+    {
+      int cnt = -1;
+      // start
+      start();
+      // write slave address and command
+      if (write((addr << 1) | SimpleWire_WRITE) == 0 && write(cmd) == 0)
+      {
+        // write data
+        for (cnt = 0; cnt < len; ++cnt)
+        {
+          if (write(*buf++))
+            break;
+        }
+      }
+      // stop
+      stop();
+      return cnt;
+    }
+
+    static int readWithCommand(uint8_t addr, const uint8_t cmd, uint8_t *buf, uint8_t len)
+    {
+      // start
+      start();
+      // write slave address and command
+      bool ret = (write((addr << 1) | SimpleWire_WRITE) == 0 && write(cmd) == 0);
+      // stop
+      stop();
+      return (ret) ? read(addr, buf, len) : -1;
+    }
+    /*  The end of the functional enhancement  */
 };
 
 template<uint8_t MODE = SimpleWire_100K, uint8_t BUFFER_LENGTH = 32>

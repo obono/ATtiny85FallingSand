@@ -51,8 +51,7 @@ PROGMEM static const uint16_t wallPattern[WALL_TYPE_MAX][BOX_SIZE] = {
 
 /*  Local Variables  */
 
-static uint16_t sands[BOX_SIZE];
-static bool     isScattered;
+static bool isScattered;
 
 /*---------------------------------------------------------------------------*/
 
@@ -80,7 +79,7 @@ void updateSands(void)
     if (counter > 0) {
         if (--counter == 0) {
             if (!isScattered) scatterSands(config.amountType, config.wallType);
-            saveConfig();
+            saveConfig(EEPROM_ADDR_TYPES, &config.wallType, EEPROM_SIZE_TYPES);
         }
     } else {
         XYZ_T *pAccel = getAcceleration();
@@ -88,16 +87,11 @@ void updateSands(void)
     }
 }
 
-void drawSands(int16_t y, uint8_t *pBuffer)
-{
-    memcpy(pBuffer, (uint8_t*)(&sands[y]), PAGE_DATA_LENGTH);
-}
-
 /*---------------------------------------------------------------------------*/
 
 static void arrangeWalls(uint8_t wallType)
 {
-    memcpy_P(sands, wallPattern[wallType], sizeof(sands));
+    memcpy_P(screenBuffer, wallPattern[wallType], sizeof(screenBuffer));
     isScattered = false;
 }
 
@@ -108,7 +102,7 @@ static void scatterSands(uint8_t amountType, uint8_t wallType)
 
     for (uint8_t y = 0; y < BOX_SIZE; y++) {
         for (uint8_t x = 0; x < BOX_SIZE; x++) {
-            if (mersenneRandom(8) < amount) bitSet(sands[y], x);
+            if (mersenneRandom(8) < amount) bitSet(screenBuffer[y], x);
         }
     }
     isScattered = true;
@@ -121,7 +115,7 @@ static void moveSands(int16_t vx, int16_t vy)
         uint16_t wall = pgm_read_word(&wallPattern[config.wallType][y]);
         for (uint8_t j = 0; j < BOX_SIZE; j++) {
             int8_t x = (vx < 0) ? j : BOX_SIZE - 1 - j;
-            if (bitRead(sands[y], x) && !bitRead(wall, x)) moveSand(x, y, vx, vy);
+            if (bitRead(screenBuffer[y], x) && !bitRead(wall, x)) moveSand(x, y, vx, vy);
         }
     }
 }
@@ -132,10 +126,10 @@ static void moveSand(int8_t x, int8_t y, int16_t vx, int16_t vy)
     int8_t dy = y + ternaryRandom(vy);
     if (dx < 0 || dx >= BOX_SIZE) dx = x;
     if (dy < 0 || dy >= BOX_SIZE) dy = y;
-    if (bitRead(sands[dy], dx)) {
+    if (bitRead(screenBuffer[dy], dx)) {
         if (!(dx != x && dy != y)) return;
-        if (bitRead(sands[y], dx)) dx = x;
-        if (bitRead(sands[dy], x)) dy = y;
+        if (bitRead(screenBuffer[y], dx)) dx = x;
+        if (bitRead(screenBuffer[dy], x)) dy = y;
         if (dx == x && dy == y) return;
         if (dx != x && dy != y) {
             if (mersenneRandom(1)) {
@@ -145,8 +139,8 @@ static void moveSand(int8_t x, int8_t y, int16_t vx, int16_t vy)
             }
         }
     }
-    bitClear(sands[y], x);
-    bitSet(sands[dy], dx);
+    bitClear(screenBuffer[y], x);
+    bitSet(screenBuffer[dy], dx);
 }
 
 static int8_t ternaryRandom(int16_t r)
